@@ -106,6 +106,7 @@ struct asus_kbd_leds {
 	unsigned int brightness;
 	spinlock_t lock;
 	bool removed;
+	int report_id;
 };
 
 struct asus_touchpad_info {
@@ -498,7 +499,7 @@ static enum led_brightness asus_kbd_backlight_get(struct led_classdev *led_cdev)
 static void asus_kbd_backlight_work(struct work_struct *work)
 {
 	struct asus_kbd_leds *led = container_of(work, struct asus_kbd_leds, work);
-	u8 buf[] = { FEATURE_KBD_REPORT_ID, 0xba, 0xc5, 0xc4, 0x00 };
+	u8 buf[] = { led->report_id, 0xba, 0xc5, 0xc4, 0x00 };
 	int ret;
 	unsigned long flags;
 
@@ -525,7 +526,7 @@ static bool asus_kbd_wmi_led_control_present(struct hid_device *hdev)
 		return false;
 
 	if (drvdata->quirks & QUIRK_ROG_NKEY_KEYBOARD &&
-			dmi_check_system(asus_use_hid_led_dmi_ids)) {
+			(dmi_check_system(asus_use_hid_led_dmi_ids) || asus_use_hidraw_led())) {
 		hid_info(hdev, "using HID for asus::kbd_backlight\n");
 		return false;
 	}
@@ -537,6 +538,11 @@ static bool asus_kbd_wmi_led_control_present(struct hid_device *hdev)
 		return false;
 
 	return !!(value & ASUS_WMI_DSTS_PRESENCE_BIT);
+}
+
+static bool asus_kbd_is_input_led(void) {
+	return dmi_match(DMI_PRODUCT_NAME, "GU605")
+		|| dmi_match(DMI_PRODUCT_NAME, "GA403");
 }
 
 /*
@@ -684,6 +690,10 @@ static int asus_kbd_register_leds(struct hid_device *hdev)
 					      GFP_KERNEL);
 	if (!drvdata->kbd_backlight)
 		return -ENOMEM;
+
+	drvdata->kbd_backlight->report_id = FEATURE_KBD_REPORT_ID;
+	if (drvdata->quirks & QUIRK_ROG_NKEY_KEYBOARD && asus_kbd_is_input_led())
+		drvdata->kbd_backlight->report_id = FEATURE_KBD_LED_REPORT_ID1;
 
 	drvdata->kbd_backlight->removed = false;
 	drvdata->kbd_backlight->brightness = 0;

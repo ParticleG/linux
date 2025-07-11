@@ -168,6 +168,35 @@ static inline int asus_wmi_evaluate_method(u32 method_id, u32 arg0, u32 arg1,
 #endif
 
 /* To be used by both hid-asus and asus-wmi to determine which controls kbd_brightness */
+#if IS_REACHABLE(CONFIG_ASUS_WMI)
+static bool asus_use_hidraw_led(void) {
+   	const char *product, *board;
+
+	product = dmi_get_system_info(DMI_PRODUCT_NAME);
+	if (!product)
+		return true;
+
+	if (strcmp(product, "ROG Zephyrus")
+		|| strcmp(product, "ROG Strix")
+		|| strcmp(product, "ROG Flow")
+		|| strcmp(product, "GA403")
+		|| strcmp(product, "GU605"))
+		return false;
+
+	board = dmi_get_system_info(DMI_PRODUCT_NAME);
+	if (!board)
+		return true;
+
+	return strcmp(board, "RC71L");
+}
+#else
+static inline bool asus_use_hidraw_led(void) {
+	return true;
+}
+#endif
+
+
+/* To be used by both hid-asus and asus-wmi to determine which controls kbd_brightness */
 static const struct dmi_system_id asus_use_hid_led_dmi_ids[] = {
 	{
 		.matches = {
